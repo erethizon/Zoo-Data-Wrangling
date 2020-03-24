@@ -1,0 +1,80 @@
+---
+title: "Prepare the Classification Data"
+output: html_notebook
+---
+
+## Introduction
+
+When we pull a classification file straight from the Zooniverse, there is quite a bit of cleaning that must take place prior to even deciphering what the data look like.  This code will walk us through the first few of those steps.
+
+## Prep the workspace.
+Clear the workspace and turn on required packages.
+
+```{r}
+rm(list = ls()) #clears the workspace
+library(dplyr)
+
+```
+## Step1. Pull in some data.
+```{r}
+DF<-read.csv("Data/north-country-wild-classifications.2.3.2020.csv", sep = ",")
+```
+
+## Step 2. Isolate the correct workflow and workflow version.
+We can modify a function I wrote called `choose_workflow_version` to accomplish this task.  However, that function asks for user input.  Here, we will modify it to a series of functions that simply print the workflows and versions in the data frame so that the user can then filter by desired.
+
+### Define some functions (to perhaps later move to a .R script)
+```{r}
+#Define the functions
+identify_workflows<- function(df) {
+  #identify workflows by making workflow_id                   #into a factor
+  df$workflow_id<-as.factor(df$workflow_id)
+  workflows<-levels(df$workflow_id) 
+  return(workflows)
+  }
+
+id_wf_versions<-function(df) {
+#identify the workflow versions after you have isolated the data set to the proper workflow. Pass this the DF that has been reduced to a single workflow.
+  df$workflow_version<-as.factor(df$workflow_version)
+  wf_versions<-levels(df$workflow_version)
+  return(wf_versions)
+}    
+      
+subset_to_workflow<-function(df, workflow, wf_version){
+  myData<-filter(df, workflow_id == workflow)
+  myData1<-filter(myData, workflow_version == wf_version)
+  return(myData1)
+} 
+
+```
+### Execute the functions
+Isolate data to single workflow:
+1. Identify workflows
+```{r}
+#identify workflows
+myWorkflows<-identify_workflows(DF)
+myWorkflows
+```
+2. Subset data accordingly
+```{r}
+DF<-filter(DF, workflow_id == 12161) #fill in after viewing possible workflows
+```
+3. Identify workflow versions
+```{r}
+#identify workflow versions
+myVersions<-id_wf_versions(DF)
+myVersions
+```
+4. Subset DF to correct workflow version
+```{r}
+DF<-filter(DF, workflow_version == 6.5)
+```
+Now write the file for further use.
+```{r}
+write.csv(DF, "Data/class.2.3.2020.clean.csv")
+```
+
+This leaves us with a new reduced data set from a single workflow and workflow version.  The next step is to deal with (remove) data from cameras that weren't working. Our first step will be to "flatten" the file so that the columns called "metadata", "annotations" and "subject_data" can be unpacked.  Each is stored in JSON format. To do so, see the .Rmd called `flatten-zooniverse-file.Rmd`.  
+
+
+

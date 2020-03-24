@@ -1,0 +1,7 @@
+---
+title: "Removing camera errors"
+output: html_notebook
+---
+
+The entire dataset on zooniverse may have images that we don't want to include in the data analysis because e.g. the camera was malfunctioning, a bear nudged it so it took pictures of the ground after a certain point, etc.  This code will help to take care of those errors.
+
