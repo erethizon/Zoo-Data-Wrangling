@@ -5,5 +5,4 @@
 .DS_Store
 north-country-wild-classifications.03.16.20.csv
 north-country-wild-classifications.03.16.20-flattened.csv
-aggregate_classifications.Rmd
 *.html
