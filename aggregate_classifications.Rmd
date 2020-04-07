@@ -23,7 +23,8 @@ This is a very large data set (64229 rows).  But let's take a look at a few thin
 
 1. How many unique subject_ids are there?
 ```{r}
-length(unique(Classified$subject_ids))
+length(unique(Classified$subject_ids)) #or
+n_distinct((Classified$subject_ids))
 ```
 2. How many unique classification_ids are there?
 ```{r}
@@ -57,7 +58,7 @@ check_spp_counts <- Classified %>%
      group_by(subject_ids, classification_id) %>% 
      mutate(num_species = n_distinct(choice),
             check_num_spp = n())
-
+#num_species is the number of different choices per subject id.  check_num_spp is the number of observations in the group.
 
 ```
 
@@ -151,11 +152,14 @@ species_votes <- grouped_classifications %>%
             propclass = votes/num_class) #calculate proportion of classifications for this species
 ```
 
-Tally votes for factor questions with single YES OR NO answers. Need to idenfity single choice columns. columns. 
+Tally votes for factor questions with single YES OR NO answers. Need to idenfity single choice columns. 
 
 Start by renaming the answers.HOWMANY column to get rid of the `answers.` prefix so that we can use it to our advantage for the other columns. Use base r. Then assign a variable to identify this column.
 ```{r}
 names(cleaned_classifications)[names(cleaned_classifications)=="answers.HOWMANY"]<-"How_many"
+
+#do the same for grouped_classifications
+names(grouped_classifications)[names(grouped_classifications)=="answers.HOWMANY"]<-"How_many"
 
 howmany_column <- "How_many" # this is a special kind of single-answer column. 
 ```
@@ -182,31 +186,26 @@ calc_prop <- function(x, NA_action = "non_answer") {
 ```
 
 
-# Tally votes for the different behaviors (or other multi-choice feature) for each species.
 ```{r}
-multi_answer_votes <- grouped_classifications %>%
-     summarise_at(., .vars = multi_answer_cols, funs(calc_prop))
-
 howmany_votes <- grouped_classifications %>%
-     mutate(Number = dplyr::recode(as.character(Number), '1' = '1', '2' = '2', '35' = '4', '610' = '8', 'MANY' = '20')) %>%
-     mutate(Number = as.numeric(Number)) %>%
-     summarise_at(., .vars = howmany_column, funs(med_count = median, min_count = min, max_count = max))
+     mutate(How_many = dplyr::recode(as.character(How_many), '1' = '1', '2' = '2', '3' = '3')) %>%
+     mutate(How_many = as.numeric(How_many)) %>%
+     summarise_at(., .vars = howmany_column, list(med_count = median, min_count = min, max_count = max))
 ```
 
 
 # Okay, so the full dataset has all of the aggregate votes per species. The only thing left is to select the top n species for each subject.
 ```{r}
-all_data <- full_join(species_votes, howmany_votes) %>% full_join(., multi_answer_votes)
+aggregated_data <- full_join(species_votes, grouped_classifications) 
 
-#write.csv(final_dat, file = "cleaned_data.csv")
+write.csv(aggregated_data, file = "Data/aggregated_data.csv")
 ```
+End result is a new csv that has all of the aggregated data, including the choice and proportion of votes for each species choice.
 
 ```{r}
 Bad_data <- filter(all_data, diff_species > 1)
 
-#Bad_data_final <- Bad_data %>% group_by(subject_ids, votes) %>%   
      
-
 Final_data <- all_data %>% group_by(subject_ids)
 ```
 
@@ -214,34 +213,11 @@ Final_data <- all_data %>% group_by(subject_ids)
 Good_data <- all_data %>% group_by(subject_ids) %>% summarise(
      votes = length(votes)
 )
-#X <- filter(Good_data, num_rows > 1) 
 
 ```
 
-```{r}
-#Group<- all_data %>% group_by(all_data$subject_ids) %>% order_by(all_data$votes)
-```
-
-Import modified data frame
-```{r}
-Final_data <- read_csv("~/Dropbox/Zooniverse_work/Final_data.csv")
-```
-
-Match the forest type with subject ID
-```{r}
-Sifted_data<- DF[match(unique(DF$subject_ids), DF$subject_ids),]
-
-write.csv(Sifted_data, file = "Sifted_data.csv")
-```
-
-```{r}
-duplicated(Final_data$subject_ids)
-length(Final_data$subject_ids)
 
 
-```
-
-The final data frame did not contain dates. We need to add these in. 
 ```{r}
 Metadata <- read.csv("~/Dropbox/Zooniverse_work/Game Camera Metadata Field Sheets 2019.csv")
 
