@@ -35,125 +35,59 @@ Great!
 ### Step 3. Sort out ids
 Now that we have all the data, we need to reduce the data set to the single species identification for each event.
 
+For any event with a species receiving a proportion of the vote of 4 or 5 of 5 votes (proportion = 0.8 or higher), we will go with the most frequently assigned classification.
 
+First, let's get just those events with propvote >= 0.8
 
-#Species Accumulation Curve
 ```{r}
-joinedData <- read.csv("~/Dropbox/Zooniverse_work/joinedData.csv")
-library(vegan)
+DF80<-filter(DF, propvote >=0.8)
+```
+And now reduce that data set to just the single highest choice for each subject_id:
+```{r}
+Choices80<-DF80 %>% group_by(subject_ids) %>% slice(which.max(propvote))
+```
+This dataset is ready for further analysis.
 
+For the remaining events, we will need to look at the images and make a final determination.
 
-#Reformulate deployment dates so they are as.dates and they are in the same order for taking the difference later on
-joinedData$Date_Checked<- format(as.Date(joinedData$Date_Checked, format="%m/%d/%y"),"%y/%m/%d")
+```{r}
+DF60<-filter(DF, propvote < 0.8)
+```
+Now we'd like to be able to get a summary data set that includes the subject id and then spreads the choices across rows.  We'll dump a bunch of unneeded rows as well.
 
-joinedData$Date_Out<- format(as.Date(joinedData$Date_Out, format="%m/%d/%y"),"%y/%m/%d")
-
-#Calculate Camera Trap Days by taking the difference in Date_Out and Date_Checked data. 
-joinedData$Camera_Trap_Days<- difftime(joinedData$Date_Checked, joinedData$Date_Out , units = c("days"))
-
-unique(joinedData$Camera_Trap_Days)
-
-#Need to determine how many new species introduced with each additional camera trap day
-#Calculate species richness for each camera
-Camera_richness <- DF %>% group_by(ForestType, ForestName, Camera) %>% summarise(
-  Number_species = n_distinct(choice)
-  )
-
-#We only have 20 of our 24 cameras being represented in our dataset
-unique(Camera_richness$Camera)
-
-#pull in camera trap days per camera and first image in event
-Cam_Trap_Days<- select(joinedData, ForestName, Camera, Camera_Trap_Days, Image1, Date_Out, Date_Checked)
-
-Camera_richness$Camera<- as.character(Camera_richness$Camera)
-Camera_richness1 <- left_join(Camera_richness, Cam_Trap_Days, by=c("ForestName", "Camera"), type='right', match='all')
-
-#This gives an output that has 931 observation of 5 variables. This has duplicates that we need to remove to get a dataset that has each camera with associated forest and number of camera trap days. 
-#Camera_richness2<- Camera_richness1[!duplicated(Camera_richness1$Camera, Camera_richness1$ForestName),]
-
-#Camera_richness2 has one row for each camera with the forest name, species richness, and camera trap days
-#Now calculate species accumulation curve
-#library(vegan)
-#Camera_richness2<- Camera_richness1[,1:5]=sapply(Camera_richness1[,1:5],as.numeric)
-#SpecAccum<- specaccum(Camera_richness2)
-
-#Problem here. Is it possible to calculate species accumulation curve wihen we cannot tell how many new species added each day?
-#Trial- add in event (subjectid data) and event date and calculate how many new species each day
-
-R1B1 <- read.csv("~/Dropbox/Zooniverse_work/Round1/R1B1.csv")
-
-ImageDates<- select(R1B1, "FileName", "DateTimeOriginal")
-
-#names(ImageDates)<- c("Image1", "Image_Date")
-
-#ImageDates1<- select(Sifted_data, "Image1")
-
-#ImageDates2<- left_join(ImageDates, ImageDates1, by=c("Image1"), type='right', match='all')
-
-names(ImageDates)<- c("Image1", "DateTimeOriginal")
-
-ImageDates1<- inner_join(ImageDates, Cam_Trap_Days, by=c("Image1"), type='right', match='all')
-
-#ImageDates1 shows the first image per event with associated time of capture. This will hopefully allow us to determine how many new species we got per day. Still need to pull in choice per subject.
-
-#Isolate choices per event to join with the ImageDates1 dataset so we can see which species are selected per event
-Choice<- select(Data_Clean_up, "choice", "Image1")
-
-ImageDates2<- inner_join(ImageDates1, Choice, by=c("Image1"), type='right', match='all')
-
-write.csv(ImageDates2, file = "Gus.csv")
-
-#Calculate Species Accumulation Curve
-library(vegan)
-library(lubridate)
-ImageDates2$DateTimeOriginal<- ymd(ImageDates2$DateTimeOriginal)
-SpecAccum<- specaccum(ImageDates2, method = "exact", permutations = 100)
-plot(SpecAccum)
-#This does not work.
+```{r}
+DF60<-DF60 %>% select(subject_ids, num_class, diff_species, choice, propvote, classification_id,Imj1, Imj2, Img3, ForestName)
 ```
 
 
-#Diversity
+Now loop through to list the choices
+
+
 ```{r}
-div<-diversity(joinedData, index="shannon")
+numSubjects<-n_distinct(DF60$subject_ids)
+subj_ids<-unique(DF60$subject_ids)
+species<-character()
+for (i in 1:numSubjects){
+  set<-DF60 %>% filter(subject_ids == subj_ids[i])
+  species[i]<-paste(set$choice, collapse = ", ")
+}
+#now bind species and subject_ids to then join to main DF
+data<-as.data.frame(cbind(subj_ids, species), stringsAsFactors = F)
+data$subj_ids<-as.integer(data$subj_ids)
 ```
+Now subset the DF60 to the top choice and then join the choices we just made.
 
-
-Calculations for richness per camera
 ```{r}
-#This first part did not work for some reason, even though the code should be correct.
-#DF$Camera<-as.factor(DF$Camera)
+Choices60<-DF60 %>% group_by(subject_ids) %>% slice(which.max(propvote))
 
-#Spec<- filter(DF, "Camera", "choice")
-
-#Species<- DF %>% group_by(Camera) %>% summarise(
-#     n_species = n_distinct(choice)
-#)
-
-
-Cam_3<- filter(DF, Camera == "3")
-Cam_4<- filter(DF, Camera == "4")
-Cam_8<- filter(DF, Camera == "8")
-Cam_9<- filter(DF, Camera == "9")
-Cam_11<- filter(DF, Camera == "11")
-Cam_14<- filter(DF, Camera == "14")
-Cam_15<- filter(DF, Camera == "15")
-Cam_17<- filter(DF, Camera == "17")
-Cam_18<- filter(DF, Camera == "18")
-Cam_21<- filter(DF, Camera == "21")
-Cam_22<- filter(DF, Camera == "22")
-Cam_24<- filter(DF, Camera == "24")
-Cam_25<- filter(DF, Camera == "25")
-Cam_28<- filter(DF, Camera == "28")
-Cam_29<- filter(DF, Camera == "29")
-Cam_31<- filter(DF, Camera == "31")
-Cam_32<- filter(DF, Camera == "32")
-Cam_33<- filter(DF, Camera == "33")
+Choices60<-left_join(Choices60, data, by = c("subject_ids" = "subj_ids"))
 ```
+Now save for further use in looking at images
 
-
-
-
+```{r}
+write.csv(Choices60, "Data/need_evaluation.csv")
+```
+Once those choices are reconciled, we can bring back this data set and join it to Choices80 for further analysis.
 
 
 
